@@ -7,6 +7,7 @@ mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
 import tensorflow as tf
 import math
+
 sess = tf.InteractiveSession()
 
 
@@ -28,18 +29,18 @@ def max_pool_2x2(x, ksize):
   return tf.nn.max_pool(x, ksize=[1, ksize, ksize, 1],
                         strides=[1, ksize, ksize, 1], padding='SAME')
 
-# Pagrindinis metodas individo treniravimui
-def execCNN(LA):
-    x = tf.placeholder(tf.float32, shape=[None, 784])
-    y_ = tf.placeholder(tf.float32, shape=[None, 10])
 
-    # 28*28 = 784
+x = tf.placeholder(tf.float32, shape=[None, 784])
+y_ = tf.placeholder(tf.float32, shape=[None, 10])
+isTest = tf.placeholder(tf.bool)
+
+def CNN_model(data, LA):
     currentSize = 784
     currentDepth = 1
     squareShape = int(math.sqrt(currentSize))
-    x_image = tf.reshape(x, [-1, 28, 28, 1])
-    #Nežinau kaip padaryti, kad metodas žinotu kada vykdomas testas.
-    isTest = True
+    x_image = tf.reshape(data, [-1, 28, 28, 1])
+    # Nežinau kaip padaryti, kad metodas žinotu kada vykdomas testas.
+
 
     for i in range(len(LA)):
         if LA[i][0] == "Conv":
@@ -57,37 +58,29 @@ def execCNN(LA):
             kSize = LA[i][1]
             x_image = max_pool_2x2(x_image, kSize)
             squareShape = math.ceil(squareShape / kSize)
-            currentSize = squareShape * squareShape
 
         elif LA[i][0] == "FC":
             out = LA[i][1]
-            dropOut = LA[i][2]
-
-            if isTest:
-                dropOut = 1
-
-            sq = int(math.sqrt(out))
 
             W_fc = weight_variable([squareShape * squareShape * currentDepth, out])
             b_fc = bias_variable([out])
             flat = tf.reshape(x_image, [-1, squareShape * squareShape * currentDepth])
             h_fc = tf.nn.relu(tf.matmul(flat, W_fc) + b_fc)
 
-            h_fc_drop = tf.nn.dropout(h_fc, dropOut)
 
-            x_image = tf.reshape(h_fc_drop, [-1, sq, sq, 1])
+    # Toliau tiesiog prisegu FC su 10 output
+    flat = h_fc
 
-            squareShape = sq
-            currentDepth = 1
-            currentSize = squareShape * squareShape
-
-    #Toliau tiesiog prisegu FC su 10 output
-    flat = tf.reshape(x_image, [-1, squareShape * squareShape * currentDepth])
-
-    W_fc = weight_variable([currentSize, 10])
+    W_fc = weight_variable([out, 10])
     b_fc = bias_variable([10])
 
     y_conv = tf.matmul(flat, W_fc) + b_fc
+
+    return y_conv
+
+def trainCNN(x, LA):
+
+    y_conv = CNN_model(x, LA)
 
     cross_entropy = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
@@ -104,15 +97,15 @@ def execCNN(LA):
         for i in range(400):
             batch = mnist.train.next_batch(50)
             if i % 200 == 0:
-                train_accuracy = accuracy.eval(feed_dict={x: batch[0], y_: batch[1]})
+                train_accuracy = accuracy.eval(feed_dict={x: batch[0], y_: batch[1], isTest:True})
                 print('step %d, training accuracy %g' % (i, train_accuracy))
             train_step.run(feed_dict={x: batch[0], y_: batch[1]})
 
         result = 0
-        #Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į batchus po 333 paveikslėlius)
+        # Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į batchus po 333 paveikslėlius)
         batchSize = 30
         for i in range(batchSize):
-            batch = mnist.test.next_batch(int(math.floor(10000/batchSize)))
+            batch = mnist.test.next_batch(int(math.floor(10000 / batchSize)))
             try:
                 temp = accuracy.eval(feed_dict={x: batch[0], y_: batch[1]})
             except:
@@ -120,9 +113,14 @@ def execCNN(LA):
                 return 0
             result += temp
 
-        print('Final result = %g' % (result/batchSize))
+        print('Final result = %g' % (result / batchSize))
         del sess
-        return (result/batchSize)
+        return (result / batchSize)
+
+# Pagrindinis metodas individo treniravimui
+def execCNN(LA):
+    return trainCNN(x, LA)
+
 
 
 
