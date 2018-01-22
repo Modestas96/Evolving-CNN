@@ -41,7 +41,7 @@ def CNN_model(data, LA):
     x_image = tf.reshape(data, [-1, 28, 28, 1])
     # Nežinau kaip padaryti, kad metodas žinotu kada vykdomas testas.
 
-
+    firstFC = True
     for i in range(len(LA)):
         if LA[i][0] == "Conv":
             kSize = LA[i][1]
@@ -61,11 +61,16 @@ def CNN_model(data, LA):
 
         elif LA[i][0] == "FC":
             out = LA[i][1]
+            if firstFC:
+                W_fc = weight_variable([squareShape * squareShape * currentDepth, out])
+                h_fc = tf.reshape(x_image, [-1, squareShape * squareShape * currentDepth])
+                firstFC = False
+            else:
+                W_fc = weight_variable([LA[i-1][1], out])
 
-            W_fc = weight_variable([squareShape * squareShape * currentDepth, out])
             b_fc = bias_variable([out])
-            flat = tf.reshape(x_image, [-1, squareShape * squareShape * currentDepth])
-            h_fc = tf.nn.relu(tf.matmul(flat, W_fc) + b_fc)
+
+            h_fc = tf.nn.relu(tf.matmul(h_fc, W_fc) + b_fc)
 
 
     # Toliau tiesiog prisegu FC su 10 output
@@ -120,8 +125,6 @@ def trainCNN(x, LA):
 # Pagrindinis metodas individo treniravimui
 def execCNN(LA):
     return trainCNN(x, LA)
-
-
 
 
 

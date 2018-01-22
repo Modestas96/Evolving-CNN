@@ -2,9 +2,14 @@ import CNNmnist as cnn
 import gc
 
 #Apačioje pavyzdys kaip turėtu atrodyti individo arhitektūros formatas:
-CA = [['Conv', 5, 63], ['Conv', 5, 63], ['Pool', 2], ['Conv', 5, 63], ['FC', 300, 1]]
-for _ in range(60):
-    cnn.execCNN(CA)*100
+CA = [['Conv', 15, 60], ['Pool', 4], ['FC', 141, 1], ['FC', 551, 1], ['FC', 963, 1]]
+#a = cnn.execCNN(CA)*100
+'''
+for _ in range(100):
+    a = cnn.execCNN(CA)*100
+    gc.collect()
+    print(a)
+'''
 
 def runCNN(CA):
     print(CA)
