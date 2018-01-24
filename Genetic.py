@@ -1,6 +1,6 @@
 import random
 import execProgram as CNN
-
+import os
 
 # Metodas generuoja naujus sluoksnius atsitiktinai
 # Grazina visus sukurtus tinklus
@@ -82,8 +82,7 @@ def startGenerateFCLayer(max_fc_size):
 
 # Metodas parenka sekancios kartos netus, renka, kurie bus kryzminami
 # Grazina kitos kartos tinklu masyva
-def generationSelection(past_generation_networks, fitness, best_unchanged_amount, crossover_amount, random_new_amount,
-                        max_layer_amount, max_conv_depth, max_fc_size, input_length):
+def generationSelection(past_generation_networks, fitness, best_unchanged_amount, crossover_amount, random_new_amount):
     # Kito generationo masyvas
     next_generation_networks = []
 
@@ -110,32 +109,14 @@ def generationSelection(past_generation_networks, fitness, best_unchanged_amount
         past_generation_networks[best_unchanged_idx].pop(0)
         next_generation_networks.append(past_generation_networks[best_unchanged_idx])
 
-    # Pasirinkti ir kryzminti
-    for crossover_idx in range(0, crossover_amount):
-        cross_idx1, cross_idx2 = 0
-        # Pasirenkami indeksai praeitu tinklu, kurie bus kryzminami
-        while True:
-            cross_idx1 = abs(int(random.gauss(0, len(past_generation_networks) / 10)))
-            cross_idx2 = abs(int(random.gauss(0, len(past_generation_networks) / 10)))
-            # Jei indeksai vienodi arba iseina is limitu- generuoti per nauja
-            if cross_idx1 != cross_idx2 and -1 < cross_idx1 < len(past_generation_networks) \
-                    and -1 < cross_idx2 < len(past_generation_networks):
-                break
-
-        # Kryzminti tinklus
-        next_generation_networks.append(crossover1(past_generation_networks[cross_idx1],
-                                                   past_generation_networks[cross_idx2], max_layer_amount,
-                                                   max_conv_depth, max_fc_size, input_length))
-
-    return next_generation_networks
-
 
 # Metodas apskaiciuoja (iskviecia skaicavimo metoda) kiekvieno tinklo fitness function
 # Grazina masyva su fitnessu kiekvienam tinklui atitinkamose masyvo pozicijose
 def calculateFitness(networks):
-    fitness = []
-    for net in networks:
-        fitness.append(CNN.runCNN(net))
+    # !! TUSCIAS METODAS !!
+    # Sukurti masyva, tokio dydzio kaip networks, jame ikelti fitnessai, pozicijos masyve tos pacios atitinkamam
+    # tinklui networks masyve
+    fitness = CNN.runCNN(networks)
     return fitness
 
 
@@ -176,9 +157,8 @@ def crossover1(parent1, parent2, max_layer_amount, max_conv_depth, max_fc_size, 
         cross_net = crossover_first_last_layers_merge(cross_net, parent1, parent2, max_conv_depth, max_fc_size,
                                                       input_length)
 
-    # Pakeiciami reikiami kintamieji taip, kad sutaptu dimensijos
-    cross_net = fix_network(cross_net, max_conv_depth, max_fc_size, input_length)
-
+    # Po crossoverio padaryt metoda, kuris patikrintu, ar visas CNN yra tinkamos strukturos, jei ne tai
+    # pakeistu reikiamus kintamuosius taip, kad sutaptu dimensijos
     return cross_net
 
 
@@ -299,14 +279,12 @@ def crossover_first_last_layers_swap(cross_net, parent2):
 
 def main():
     NETWORKS = startGenerateFromScratch(30, 28, 6, 64, 1000)
-    FITNESS = calculateFitness(NETWORKS)
-    for FIT in FITNESS:
-        print(FIT)
+    fitness = calculateFitness(NETWORKS)
     for NET in NETWORKS:
         print(NET)
-    #NETWORKS = generationSelection(NETWORKS, fitness, 5, 17, 3, 6, 64, 1000, 28)
-    #for NET in NETWORKS:
-    #    print(NET)
+    print(fitness)
+
+
 
 if __name__ == "__main__":
     main()

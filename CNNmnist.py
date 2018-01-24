@@ -1,130 +1,148 @@
 #ESAMOS PROBLEMOS:
     #Paleidžiant daug kartų training metodą, atsiranda ResourceExhaustedError. Taigi, reikia išsiaiškinti kaip atlaisvinti GPU atmintį po individo
     #treniravimo
-
+#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' #Nerodo warningu, tik tai ką atspausdini su print ir Errorus.
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
-
 import tensorflow as tf
 import math
-
-sess = tf.InteractiveSession()
-
-
-def weight_variable(shape):
-  initial = tf.truncated_normal(shape, stddev=0.1)
-  return tf.Variable(initial)
+import time
 
 
-def bias_variable(shape):
-  initial = tf.constant(0.1, shape=shape)
-  return tf.Variable(initial)
+class CNN:
+    Print_intermediate_accuracy = 200
+
+    def __init__(self, pop, IterationCountTrain, BatchSizeTrain, BatchSizeTest, TimeLimit):
+        self.IterationCountTrain = IterationCountTrain
+        self.BatchSizeTrain = BatchSizeTrain
+        self.TimeLimit = TimeLimit
+        self.BatchSizeTest = BatchSizeTest
+        self.graph = tf.Graph() #Sukuriu grafą į kurį kelsiu arhitektūros modelį.
+        self.mnist = input_data.read_data_sets('MNIST_data', one_hot=True) #Įkeliu MNIST duomenų bazę.
+        with self.graph.as_default():
+            self.sess = tf.InteractiveSession()
+            self.pop = pop #Populiacija yra saugoma CNN objekte
+            self.x = tf.placeholder(tf.float32, shape=[None, 784]) #Čia bus saugomi paveikslėlių batch
+            self.y_ = tf.placeholder(tf.float32, shape=[None, 10]) #Teisingi prediction
+            self.isTest = tf.placeholder(tf.bool) #Dar ne naudoju, bet ateitį naudosiu nustatyti testavimo/treniravimo būseną
+
+    def weight_variable(self, shape):
+      initial = tf.truncated_normal(shape, stddev=0.1)
+      return tf.Variable(initial)
+
+    def bias_variable(self, shape):
+      initial = tf.constant(0.1, shape=shape)
+      return tf.Variable(initial)
+
+    def conv2d(self, x, W):
+      return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+
+    def max_pool_2x2(self, x, ksize):
+      return tf.nn.max_pool(x, ksize=[1, ksize, ksize, 1],
+                            strides=[1, ksize, ksize, 1], padding='SAME')
+
+    #Dinamiškai sukuriu CNN modelį pagal duotą arhitektūrą
+    def CNN_model(self, data, LA):
+        with self.graph.as_default():
+            currentSize = 784 #Paveikslėlų išmatavimas - 28x28
+            currentDepth = 1 #Nes MNIST paveikslėliai yra Black/Wite (binary)
+            squareShape = int(math.sqrt(currentSize)) #Reikalingas, kad išlaikyčiau informaciją apie einamas paveikslėlio dimensijas
+            x_image = tf.reshape(data, [-1, 28, 28, 1])
+            # Dar nežinau kaip padaryti, kad metodas žinotu kada vykdomas testas.
+
+            firstFC = True
+            for i in range(len(LA)):
+                if LA[i][0] == "Conv":
+                    kSize = LA[i][1]
+                    depth = LA[i][2]
+
+                    W_conv = self.weight_variable([kSize, kSize, currentDepth, depth])
+                    b_conv = self.bias_variable([depth])
+
+                    x_image = tf.nn.relu(self.conv2d(x_image, W_conv) + b_conv)
+                    currentDepth = depth
+
+                elif LA[i][0] == "Pool":
+                    kSize = LA[i][1]
+                    x_image = self.max_pool_2x2(x_image, kSize)
+                    squareShape = math.ceil(squareShape / kSize)
+
+                elif LA[i][0] == "FC":
+                    out = LA[i][1]
+                    if firstFC: #Šitą vėliau pakeisiu.
+                        W_fc = self.weight_variable([squareShape * squareShape * currentDepth, out])
+                        h_fc = tf.reshape(x_image, [-1, squareShape * squareShape * currentDepth])
+                        firstFC = False
+                    else:
+                        W_fc = self.weight_variable([LA[i-1][1], out])
+
+                    b_fc = self.bias_variable([out])
+
+                    h_fc = tf.nn.relu(tf.matmul(h_fc, W_fc) + b_fc)
 
 
-def conv2d(x, W):
-  return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+            #Toliau tiesiog prisegu FC su 10 output
+            flat = h_fc
 
+            W_fc = self.weight_variable([out, 10])
+            b_fc = self.bias_variable([10])
 
-def max_pool_2x2(x, ksize):
-  return tf.nn.max_pool(x, ksize=[1, ksize, ksize, 1],
-                        strides=[1, ksize, ksize, 1], padding='SAME')
+            y_conv = tf.matmul(flat, W_fc) + b_fc
 
+            return y_conv
 
-x = tf.placeholder(tf.float32, shape=[None, 784])
-y_ = tf.placeholder(tf.float32, shape=[None, 10])
-isTest = tf.placeholder(tf.bool)
+    def trainCNN(self, LA):
 
-def CNN_model(data, LA):
-    currentSize = 784
-    currentDepth = 1
-    squareShape = int(math.sqrt(currentSize))
-    x_image = tf.reshape(data, [-1, 28, 28, 1])
-    # Nežinau kaip padaryti, kad metodas žinotu kada vykdomas testas.
+        #Sukuriu grafui modelį
+        y_conv = self.CNN_model(self.x, LA)
 
-    firstFC = True
-    for i in range(len(LA)):
-        if LA[i][0] == "Conv":
-            kSize = LA[i][1]
-            depth = LA[i][2]
+        #Apskaičiuojam prediction(cross_entropy, t.t.)
+        with self.graph.as_default():
+            cross_entropy = tf.reduce_mean(
+                tf.nn.softmax_cross_entropy_with_logits(labels=self.y_, logits=y_conv))
+            train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+            correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(self.y_, 1))
+            accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-            W_conv = weight_variable([kSize, kSize, currentDepth, depth])
-            b_conv = bias_variable([depth])
+            config = tf.ConfigProto()
+            config.gpu_options.allow_growth = True
 
-            x_image = tf.nn.relu(conv2d(x_image, W_conv) + b_conv)
+        #Paleidžiu sessioną kuris treniruos ir testuos sukurtą grafo modelį
+        with tf.Session(graph=self.graph, config=config) as sess:
+            sess.run(tf.global_variables_initializer())
+            #Treniravimas
+            print("Training has started...")
+            t0 = time.clock()
+            for i in range(self.IterationCountTrain):
+                batch = self.mnist.train.next_batch(self.BatchSizeTrain)
+                if (i+1) % self.Print_intermediate_accuracy == 0:
+                    #Paduodu į grafą paveikslėlių batchus su teisingais label, gražina batch accuracy
+                    train_accuracy = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.isTest:True})
+                    print('step %d, training accuracy %g' % (i+1, train_accuracy))
+                if time.clock()-t0 > self.TimeLimit:
+                    print("Exceeded training time limit Accuracy = ", 0)
+                    return 0
+                train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1]})
 
-            currentDepth = depth
+            result = 0
+            #Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
+            for i in range(self.BatchSizeTest):
+                batch = self.mnist.test.next_batch(int(math.floor(10000 / self.BatchSizeTest)))
+                try:
+                    temp = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1]})
+                except:
+                    print("Error, most likely memory leakage")
+                    return 0
+                result += temp
 
-        elif LA[i][0] == "Pool":
-            kSize = LA[i][1]
-            x_image = max_pool_2x2(x_image, kSize)
-            squareShape = math.ceil(squareShape / kSize)
+            print('Accuracy = ' + str("%.4f" % (result / self.BatchSizeTest)) + ' Total computation time = ' + str("%.2f" % (time.clock() - t0)) + "s")
 
-        elif LA[i][0] == "FC":
-            out = LA[i][1]
-            if firstFC:
-                W_fc = weight_variable([squareShape * squareShape * currentDepth, out])
-                h_fc = tf.reshape(x_image, [-1, squareShape * squareShape * currentDepth])
-                firstFC = False
-            else:
-                W_fc = weight_variable([LA[i-1][1], out])
+        tf.reset_default_graph()
+        return result / self.BatchSizeTest
 
-            b_fc = bias_variable([out])
-
-            h_fc = tf.nn.relu(tf.matmul(h_fc, W_fc) + b_fc)
-
-
-    # Toliau tiesiog prisegu FC su 10 output
-    flat = h_fc
-
-    W_fc = weight_variable([out, 10])
-    b_fc = bias_variable([10])
-
-    y_conv = tf.matmul(flat, W_fc) + b_fc
-
-    return y_conv
-
-def trainCNN(x, LA):
-
-    y_conv = CNN_model(x, LA)
-
-    cross_entropy = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
-    train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
-    correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-
-    with tf.Session(config=config) as sess:
-        sess.run(tf.global_variables_initializer())
-        # Treniravimas
-        for i in range(400):
-            batch = mnist.train.next_batch(50)
-            if i % 200 == 0:
-                train_accuracy = accuracy.eval(feed_dict={x: batch[0], y_: batch[1], isTest:True})
-                print('step %d, training accuracy %g' % (i, train_accuracy))
-            train_step.run(feed_dict={x: batch[0], y_: batch[1]})
-
-        result = 0
-        # Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į batchus po 333 paveikslėlius)
-        batchSize = 30
-        for i in range(batchSize):
-            batch = mnist.test.next_batch(int(math.floor(10000 / batchSize)))
-            try:
-                temp = accuracy.eval(feed_dict={x: batch[0], y_: batch[1]})
-            except:
-                print("Got em, ERROR, GREIČIAUSIAI MEMORY")
-                return 0
-            result += temp
-
-        print('Final result = %g' % (result / batchSize))
-        del sess
-        return (result / batchSize)
-
-# Pagrindinis metodas individo treniravimui
-def execCNN(LA):
-    return trainCNN(x, LA)
-
-
+    # Pagrindinis metodas individo treniravimui
+    def exec_cnn(self):
+        results = []
+        for i in range(len(self.pop)):
+            print("Individual nr.", (i+1))
+            results.append(self.trainCNN(self.pop[i])*100)
 
