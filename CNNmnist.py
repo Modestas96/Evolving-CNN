@@ -143,6 +143,8 @@ class CNN:
     def exec_cnn(self):
         results = []
         for i in range(len(self.pop)):
+            print(self.pop[i])
             print("Individual nr.", (i+1))
             results.append(self.trainCNN(self.pop[i])*100)
+        return results
 
