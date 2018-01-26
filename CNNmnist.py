@@ -23,7 +23,7 @@ class CNN:
             self.pop = pop #Populiacija yra saugoma CNN objekte
             self.x = tf.placeholder(tf.float32, shape=[None, 784]) #Čia bus saugomi paveikslėlių batch
             self.y_ = tf.placeholder(tf.float32, shape=[None, 10]) #Teisingi prediction
-            self.is_test = tf.placeholder(tf.bool) #Dar ne naudoju, bet ateitį naudosiu nustatyti testavimo/treniravimo būseną
+            self.is_train = tf.placeholder(tf.bool) #Naudojamas nustatyti ar vykdomas testavimas. Tam, kad galeciau nevykdyti drop_out
 
     def weight_variable(self, shape):
       initial = tf.truncated_normal(shape, stddev=0.1)
@@ -80,7 +80,7 @@ class CNN:
 
                     h_fc = tf.nn.relu(tf.matmul(h_fc, W_fc) + b_fc)
 
-                    h_fc = tf.cond(self.is_test, lambda: tf.nn.dropout(h_fc, drop), lambda: h_fc)
+                    h_fc = tf.cond(self.is_train, lambda: tf.nn.dropout(h_fc, drop), lambda: h_fc)#Jei treniruojame, tada nustatome drop_out pagal duotą parametrą. Jei ne tada drop_out nededame.
 
 
             #Toliau tiesiog prisegu FC su 10 output
@@ -120,19 +120,19 @@ class CNN:
                 batch = self.mnist.train.next_batch(self.BatchSizeTrain)
                 if (i+1) % self.Print_intermediate_accuracy == 0:
                     #Paduodu į grafą paveikslėlių batchus su teisingais label, gražina batch accuracy
-                    train_accuracy = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_test: True})
+                    train_accuracy = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
                     print('step %d, training accuracy %g' % (i+1, train_accuracy))
                 if time.clock()-t0 > self.TimeLimit:
                     print("Exceeded training time limit Accuracy = ", 0)
                     return 0
-                train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_test: True})
+                train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
 
             result = 0
             #Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
             for i in range(self.BatchSizeTest):
                 batch = self.mnist.test.next_batch(int(math.floor(10000 / self.BatchSizeTest)))
                 try:
-                    temp = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_test: False})
+                    temp = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: False})
                 except:
                     print("Error, most likely memory leakage")
                     return 0
