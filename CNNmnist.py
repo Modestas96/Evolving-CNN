@@ -1,8 +1,8 @@
 #ESAMOS PROBLEMOS:
     #Paleidžiant daug kartų training metodą, atsiranda ResourceExhaustedError. Taigi, reikia išsiaiškinti kaip atlaisvinti GPU atmintį po individo
     #treniravimo
+import os
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' #Nerodo warningu, tik tai ką atspausdini su print ir Errorus.
-from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
 import math
 import time
@@ -11,13 +11,13 @@ import time
 class CNN:
     Print_intermediate_accuracy = 200
 
-    def __init__(self, pop, IterationCountTrain, BatchSizeTrain, BatchSizeTest, TimeLimit):
+    def __init__(self, pop, IterationCountTrain, BatchSizeTrain, BatchSizeTest, TimeLimit, dataset):
         self.IterationCountTrain = IterationCountTrain
         self.BatchSizeTrain = BatchSizeTrain
         self.TimeLimit = TimeLimit
         self.BatchSizeTest = BatchSizeTest
         self.graph = tf.Graph() #Sukuriu grafą į kurį kelsiu arhitektūros modelį.
-        self.mnist = input_data.read_data_sets('MNIST_data', one_hot=True) #Įkeliu MNIST duomenų bazę.
+        self.mnist = dataset
         with self.graph.as_default():
             self.sess = tf.InteractiveSession()
             self.pop = pop #Populiacija yra saugoma CNN objekte
@@ -108,7 +108,8 @@ class CNN:
 
         #Paleidžiu sessioną kuris treniruos ir testuos sukurtą grafo modelį
         with tf.Session(graph=self.graph, config=config) as sess:
-            sess.run(tf.global_variables_initializer())
+            v = sess.run(tf.global_variables_initializer())
+            print(v)
             #Treniravimas
             print("Training has started...")
             t0 = time.clock()
@@ -136,15 +137,12 @@ class CNN:
 
             print('Accuracy = ' + str("%.4f" % (result / self.BatchSizeTest)) + ' Total computation time = ' + str("%.2f" % (time.clock() - t0)) + "s")
 
-        tf.reset_default_graph()
         return result / self.BatchSizeTest
 
     # Pagrindinis metodas individo treniravimui
     def exec_cnn(self):
-        results = []
-        for i in range(len(self.pop)):
-            print(self.pop[i])
-            print("Individual nr.", (i+1))
-            results.append(self.trainCNN(self.pop[i])*100)
-        return results
+
+        result = self.trainCNN(self.pop) * 100
+        tf.reset_default_graph()
+        return result
 

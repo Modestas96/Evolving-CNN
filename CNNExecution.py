@@ -1,6 +1,6 @@
 import CNNmnist as cnn
 import math
-
+from tensorflow.examples.tutorials.mnist import input_data
 '''
 Kaip naudoti:
      1. Sukuri objektą CNNExecution.CNNExecution()
@@ -16,14 +16,15 @@ Pavyzdys:
     
     fitness = CNNexe.CNNExecution().evaluate_population(Networks)
     
-    print(fitness): [89.1235, 90.321, 92.1253, 70.1234, 95.3134]  
-     
-     
+    print(fitness): [89.1235, 90.321, 92.1253, 70.1234, 95.3134]       
 '''
+
+
 class CNNExecution:
     example_count_train = 20000 #Su kiek nuotraukų treniruosime individą
     batch_size_test = 20 #Į kiek dalių skaidyti testavimo dataset (ne mažinti, gali išmesti errorą dėl atminties trūkumo)
     training_time_limit = 180 #Treniravimo laiko limitas. Jei bus viršyta, treniravimas bus nutrauktas ir accuracy nustatomas į 0
+    data_set = input_data.read_data_sets('MNIST_data', one_hot=True)
 
     def __init__(self, batch_size_train=50):
         try:
@@ -38,5 +39,12 @@ class CNNExecution:
     def evaluate_population(self, population, nr=-1):
         if nr != -1:
             print("Generation nr. ", nr)
-        return cnn.CNN(population, self.iteration_count, self.batch_size_train, self.batch_size_test, self.training_time_limit).exec_cnn()
+        rez = []
+        i = 1
+        for individual in population:
+            print("Individual nr. ", i)
+            print(str(individual))
+            rez.append(cnn.CNN(individual, self.iteration_count, self.batch_size_train, self.batch_size_test, self.training_time_limit, self.data_set).exec_cnn())
+            i+=1
+        return rez
 
