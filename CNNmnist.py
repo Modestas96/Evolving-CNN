@@ -11,19 +11,19 @@ import time
 class CNN:
     Print_intermediate_accuracy = 200
 
-    def __init__(self, pop, IterationCountTrain, BatchSizeTrain, BatchSizeTest, TimeLimit, dataset):
+    def __init__(self, pop, IterationCountTrain, BatchSizeTrain, BatchSizeTest, TimeLimit, data_set):
         self.IterationCountTrain = IterationCountTrain
         self.BatchSizeTrain = BatchSizeTrain
         self.TimeLimit = TimeLimit
         self.BatchSizeTest = BatchSizeTest
         self.graph = tf.Graph() #Sukuriu grafą į kurį kelsiu arhitektūros modelį.
-        self.mnist = dataset
+        self.mnist = data_set
         with self.graph.as_default():
             self.sess = tf.InteractiveSession()
             self.pop = pop #Populiacija yra saugoma CNN objekte
             self.x = tf.placeholder(tf.float32, shape=[None, 784]) #Čia bus saugomi paveikslėlių batch
             self.y_ = tf.placeholder(tf.float32, shape=[None, 10]) #Teisingi prediction
-            self.isTest = tf.placeholder(tf.bool) #Dar ne naudoju, bet ateitį naudosiu nustatyti testavimo/treniravimo būseną
+            self.is_test = tf.placeholder(tf.bool) #Dar ne naudoju, bet ateitį naudosiu nustatyti testavimo/treniravimo būseną
 
     def weight_variable(self, shape):
       initial = tf.truncated_normal(shape, stddev=0.1)
@@ -68,6 +68,7 @@ class CNN:
 
                 elif LA[i][0] == "FC":
                     out = LA[i][1]
+                    drop = LA[i][2]
                     if firstFC: #Šitą vėliau pakeisiu.
                         W_fc = self.weight_variable([squareShape * squareShape * currentDepth, out])
                         h_fc = tf.reshape(x_image, [-1, squareShape * squareShape * currentDepth])
@@ -78,6 +79,8 @@ class CNN:
                     b_fc = self.bias_variable([out])
 
                     h_fc = tf.nn.relu(tf.matmul(h_fc, W_fc) + b_fc)
+
+                    h_fc = tf.cond(self.is_test, lambda: tf.nn.dropout(h_fc, drop), lambda: h_fc)
 
 
             #Toliau tiesiog prisegu FC su 10 output
@@ -117,19 +120,19 @@ class CNN:
                 batch = self.mnist.train.next_batch(self.BatchSizeTrain)
                 if (i+1) % self.Print_intermediate_accuracy == 0:
                     #Paduodu į grafą paveikslėlių batchus su teisingais label, gražina batch accuracy
-                    train_accuracy = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.isTest:True})
+                    train_accuracy = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_test: True})
                     print('step %d, training accuracy %g' % (i+1, train_accuracy))
                 if time.clock()-t0 > self.TimeLimit:
                     print("Exceeded training time limit Accuracy = ", 0)
                     return 0
-                train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1]})
+                train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_test: True})
 
             result = 0
             #Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
             for i in range(self.BatchSizeTest):
                 batch = self.mnist.test.next_batch(int(math.floor(10000 / self.BatchSizeTest)))
                 try:
-                    temp = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1]})
+                    temp = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_test: False})
                 except:
                     print("Error, most likely memory leakage")
                     return 0
@@ -141,7 +144,6 @@ class CNN:
 
     # Pagrindinis metodas individo treniravimui
     def exec_cnn(self):
-
         result = self.trainCNN(self.pop) * 100
         tf.reset_default_graph()
         return result
