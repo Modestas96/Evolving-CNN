@@ -19,7 +19,6 @@ Pavyzdys:
     print(fitness): [89.1235, 90.321, 92.1253, 70.1234, 95.3134]       
 '''
 
-
 class CNNExecution:
     batch_size_test = 20 #Į kiek dalių skaidyti testavimo dataset (ne mažinti, gali išmesti errorą dėl atminties trūkumo)
     training_time_limit = 180 #Treniravimo laiko limitas. Jei bus viršyta, treniravimas bus nutrauktas ir accuracy nustatomas į 0
@@ -28,8 +27,6 @@ class CNNExecution:
     def __init__(self, example_count_train=20000):
         try:
             self.example_count_train = example_count_train  # Su kiek nuotraukų treniruosime individą
-            print(self.iteration_count)
-
         except Exception as error:
             print('Caught this error: ' + repr(error))
 
@@ -41,9 +38,9 @@ class CNNExecution:
         i = 1
         for individual in population:
             print("-----------------------------------------------------------------------------------")
-            print("Individual nr. ", i)
+            #print("Individual nr. ", i)
             print(str(individual))
-            batch_size_train = individual[len(individual)-1][0]
+            batch_size_train = 50
             if batch_size_train <= 0:
                 print("Batch size must be greater than 0, skipping this")
                 continue
