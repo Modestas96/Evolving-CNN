@@ -111,8 +111,7 @@ class CNN:
 
         #Paleidžiu sessioną kuris treniruos ir testuos sukurtą grafo modelį
         with tf.Session(graph=self.graph, config=config) as sess:
-            v = sess.run(tf.global_variables_initializer())
-            print(v)
+            sess.run(tf.global_variables_initializer())
             #Treniravimas
             print("Training has started...")
             t0 = time.clock()
