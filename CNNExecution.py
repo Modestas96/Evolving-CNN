@@ -25,13 +25,9 @@ class CNNExecution:
     training_time_limit = 180 #Treniravimo laiko limitas. Jei bus viršyta, treniravimas bus nutrauktas ir accuracy nustatomas į 0
     data_set = input_data.read_data_sets('MNIST_data', one_hot=True)
 
-    def __init__(self, example_count_train=20000, batch_size_train=50):
+    def __init__(self, example_count_train=20000):
         try:
-            if batch_size_train <= 0:
-                raise Exception('Batch size should be greater than 0')
-            self.batch_size_train = batch_size_train
             self.example_count_train = example_count_train  # Su kiek nuotraukų treniruosime individą
-            self.iteration_count = math.floor(self.example_count_train / self.batch_size_train) #Kiek kartų iteruosime
             print(self.iteration_count)
 
         except Exception as error:
@@ -47,7 +43,13 @@ class CNNExecution:
             print("-----------------------------------------------------------------------------------")
             print("Individual nr. ", i)
             print(str(individual))
-            rez.append(cnn.CNN(individual, self.iteration_count, self.batch_size_train, self.batch_size_test, self.training_time_limit, self.data_set).exec_cnn())
-            i+=1
+            batch_size_train = individual[len(individual)-1][0]
+            if batch_size_train <= 0:
+                print("Batch size must be greater than 0, skipping this")
+                continue
+            iteration_count = math.floor(self.example_count_train / batch_size_train)
+            print("Number of steps " + str(iteration_count))
+            rez.append(cnn.CNN(individual, iteration_count, batch_size_train, self.batch_size_test, self.training_time_limit, self.data_set).exec_cnn())
+            i += 1
         return rez
 

@@ -40,6 +40,10 @@ class CNN:
       return tf.nn.max_pool(x, ksize=[1, ksize, ksize, 1],
                             strides=[1, ksize, ksize, 1], padding='SAME')
 
+    def avg_pool_2x2(self, x, ksize):
+      return tf.nn.avg_pool(x, ksize=[1, ksize, ksize, 1],
+                            strides=[1, ksize, ksize, 1], padding='SAME')
+
     #Dinamiškai sukuriu CNN modelį pagal duotą arhitektūrą
     def CNN_model(self, data, LA):
         with self.graph.as_default():
@@ -61,9 +65,12 @@ class CNN:
                     x_image = tf.nn.relu(self.conv2d(x_image, W_conv) + b_conv)
                     currentDepth = depth
 
-                elif LA[i][0] == "Pool":
+                elif LA[i][0] == "APool" or LA[i][0] == "MPool":
                     kSize = LA[i][1]
-                    x_image = self.max_pool_2x2(x_image, kSize)
+                    if LA[i][0] == "MPool":
+                        x_image = self.max_pool_2x2(x_image, kSize)
+                    else:
+                        x_image = self.avg_pool_2x2(x_image, kSize)
                     squareShape = math.ceil(squareShape / kSize)
 
                 elif LA[i][0] == "FC":
@@ -123,7 +130,7 @@ class CNN:
                     print('step %d, training accuracy %g' % (i+1, train_accuracy))
                 if time.clock()-t0 > self.TimeLimit:
                     print("Exceeded training time limit Accuracy = ", 0)
-                    return 0
+                    break
                 train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
 
             result = 0
