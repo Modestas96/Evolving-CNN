@@ -21,7 +21,7 @@ Pavyzdys:
 
 class CNNExecution:
     batch_size_test = 20 #Į kiek dalių skaidyti testavimo dataset (ne mažinti, gali išmesti errorą dėl atminties trūkumo)
-    training_time_limit = 180 #Treniravimo laiko limitas. Jei bus viršyta, treniravimas bus nutrauktas ir accuracy nustatomas į 0
+    training_time_limit = 240 #Treniravimo laiko limitas. Jei bus viršyta, treniravimas bus nutrauktas ir accuracy nustatomas į 0
     data_set = input_data.read_data_sets('MNIST_data', one_hot=True)
 
     def __init__(self, example_count_train=20000):
@@ -40,7 +40,7 @@ class CNNExecution:
             print("-----------------------------------------------------------------------------------")
             #print("Individual nr. ", i)
             print(str(individual))
-            batch_size_train = 50
+            batch_size_train = 64
             if batch_size_train <= 0:
                 print("Batch size must be greater than 0, skipping this")
                 continue

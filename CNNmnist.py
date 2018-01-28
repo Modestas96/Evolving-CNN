@@ -9,7 +9,7 @@ import time
 
 
 class CNN:
-    Print_intermediate_accuracy = 200
+    Print_intermediate_accuracy = 100
     tf.set_random_seed(1)
 
     def __init__(self, pop, IterationCountTrain, BatchSizeTrain, BatchSizeTest, TimeLimit, data_set):
@@ -119,38 +119,54 @@ class CNN:
 
         #Paleidžiu sessioną kuris treniruos ir testuos sukurtą grafo modelį
         with tf.Session(graph=self.graph, config=config) as sess:
-            sess.run(tf.global_variables_initializer())
+            #sess.run(tf.global_variables_initializer())
             #Treniravimas
             print("Training has started...")
 
             t0 = time.clock()
             a = 0
             while a < 5:
-                for i in range(self.IterationCountTrain):
-                    batch = self.mnist.train.next_batch(self.BatchSizeTrain)
-                    if (i+1) % self.Print_intermediate_accuracy == 0:
-                        #Paduodu į grafą paveikslėlių batchus su teisingais label, gražina batch accuracy
-                        train_accuracy = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
-                        print('step %d, training accuracy %g' % (i+1, train_accuracy))
-                    if time.clock()-t0 > self.TimeLimit:
-                        print("Exceeded training time limit Accuracy = ", 0)
-                        a = 100
-                        break
-                    train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
-
                 result = 0
-                # Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
-                for i in range(self.BatchSizeTest):
-                    batch = self.mnist.test.next_batch(int(math.floor(10000 / self.BatchSizeTest)))
-                    try:
-                        temp = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: False})
-                    except:
-                        print("Error, most likely memory leakage")
-                        return 0
-                    result += temp
+                b = 0
+                while b < 3:
+                    if a == 0:
+                        sess.run(tf.global_variables_initializer())
+                        print("train: " + str(b+1) + "/3")
+                    else:
+                        b = 2
+                    for i in range(self.IterationCountTrain):
+                        batch = self.mnist.train.next_batch(self.BatchSizeTrain)
+                        if (i+1) % self.Print_intermediate_accuracy == 0:
+                            #Paduodu į grafą paveikslėlių batchus su teisingais label, gražina batch accuracy
+                            train_accuracy = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
+                            print('step %d, training accuracy %g' % (i+1, train_accuracy))
+                        if time.clock()-t0 > self.TimeLimit:
+                            print("Exceeded training time limit Accuracy = ", 0)
+                            a = 100
+                            b = 2
+                            break
+                        train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
+
+                    if time.clock() - t0 > self.TimeLimit:
+                        break
+                    # Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
+                    for i in range(self.BatchSizeTest):
+                        batch = self.mnist.test.next_batch(int(math.floor(10000 / self.BatchSizeTest)))
+                        try:
+                            temp = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: False})
+                        except:
+                            print("Error, most likely memory leakage")
+                            return 0
+                        result += temp
+                    b += 1
+
+                if time.clock() - t0 > self.TimeLimit:
+                    break
+
                 should_be = 0
                 if a == 0:
                     should_be = 93.3
+                    result /= 3
                 if a == 1:
                     should_be = 95.6
                 if a == 2:
@@ -158,10 +174,10 @@ class CNN:
                 if a == 3:
                     should_be = 97.4
                 a += 1
-                print(result / self.BatchSizeTest)
+
+                print((result / self.BatchSizeTest)*100)
                 if (result / self.BatchSizeTest)*100 < should_be:
                     break
-
 
             result = 0
             #Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
