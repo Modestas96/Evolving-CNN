@@ -40,7 +40,7 @@ class CNNExecution:
             print("-----------------------------------------------------------------------------------")
             #print("Individual nr. ", i)
             print(str(individual))
-            batch_size_train = 64
+            batch_size_train = 20
             if batch_size_train <= 0:
                 print("Batch size must be greater than 0, skipping this")
                 continue

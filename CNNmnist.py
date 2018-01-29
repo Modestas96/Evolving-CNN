@@ -117,49 +117,119 @@ class CNN:
             config = tf.ConfigProto()
             config.gpu_options.allow_growth = True
 
+        result = 0
+        print("Training has started...")
         #Paleidžiu sessioną kuris treniruos ir testuos sukurtą grafo modelį
-        with tf.Session(graph=self.graph, config=config) as sess:
-            #sess.run(tf.global_variables_initializer())
-            #Treniravimas
-            print("Training has started...")
+        #1
+        with tf.Session(graph=self.graph) as sess:
+            sess.run(tf.global_variables_initializer())
+            t0 = time.clock()
 
+            for i in range(self.IterationCountTrain):
+                try:
+                    batch = self.mnist.train.next_batch(self.BatchSizeTrain)
+                    if (i + 1) % self.Print_intermediate_accuracy == 0:
+                        # Paduodu į grafą paveikslėlių batchus su teisingais label, gražina batch accuracy
+                        train_accuracy = accuracy.eval(
+                            feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
+                        print('step %d, training accuracy %g' % (i + 1, train_accuracy))
+                    if time.clock() - t0 > self.TimeLimit:
+                        print("Exceeded training time limit Accuracy = ", 0)
+                        a = 100
+                        b = 2
+                        break
+                    train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
+                except Exception as error:
+                    print('Caught this error: ' + repr(error))
+                    print("fuuu")
+
+            if time.clock() - t0 > self.TimeLimit:
+                pass
+
+            # Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
+            for i in range(self.BatchSizeTest):
+                batch = self.mnist.test.next_batch(int(math.floor(10000 / self.BatchSizeTest)))
+                try:
+                    temp = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: False})
+                except Exception as error:
+                    print('Caught this error: ' + repr(error))
+                    print("fuuu")
+                result += temp
+
+        tf.reset_default_graph()
+        #2
+        with tf.Session(graph=self.graph) as sess:
+            sess.run(tf.global_variables_initializer())
+            t0 = time.clock()
+
+            for i in range(self.IterationCountTrain):
+                try:
+                    batch = self.mnist.train.next_batch(self.BatchSizeTrain)
+                    if (i + 1) % self.Print_intermediate_accuracy == 0:
+                        # Paduodu į grafą paveikslėlių batchus su teisingais label, gražina batch accuracy
+                        train_accuracy = accuracy.eval(
+                            feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
+                        print('step %d, training accuracy %g' % (i + 1, train_accuracy))
+                    if time.clock() - t0 > self.TimeLimit:
+                        print("Exceeded training time limit Accuracy = ", 0)
+                        a = 100
+                        b = 2
+                        break
+                    train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
+                except Exception as error:
+                    print('Caught this error: ' + repr(error))
+                    print("fuuu")
+                    return 0
+
+            if time.clock() - t0 > self.TimeLimit:
+                pass
+
+            # Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
+            for i in range(self.BatchSizeTest):
+                batch = self.mnist.test.next_batch(int(math.floor(10000 / self.BatchSizeTest)))
+                try:
+                    temp = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: False})
+                except:
+                    print("Error, most likely memory leakage")
+                    return 0
+                result += temp
+        tf.reset_default_graph()
+        #3
+        with tf.Session(graph=self.graph) as sess:
+            sess.run(tf.global_variables_initializer())
             t0 = time.clock()
             a = 0
             while a < 5:
-                result = 0
-                b = 0
-                while b < 3:
-                    if a == 0:
-                        sess.run(tf.global_variables_initializer())
-                        print("train: " + str(b+1) + "/3")
-                    else:
-                        b = 2
-                    for i in range(self.IterationCountTrain):
+                for i in range(self.IterationCountTrain):
+                    try:
                         batch = self.mnist.train.next_batch(self.BatchSizeTrain)
-                        if (i+1) % self.Print_intermediate_accuracy == 0:
-                            #Paduodu į grafą paveikslėlių batchus su teisingais label, gražina batch accuracy
-                            train_accuracy = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
-                            print('step %d, training accuracy %g' % (i+1, train_accuracy))
-                        if time.clock()-t0 > self.TimeLimit:
+                        if (i + 1) % self.Print_intermediate_accuracy == 0:
+                            # Paduodu į grafą paveikslėlių batchus su teisingais label, gražina batch accuracy
+                            train_accuracy = accuracy.eval(
+                                feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
+                            print('step %d, training accuracy %g' % (i + 1, train_accuracy))
+                        if time.clock() - t0 > self.TimeLimit:
                             print("Exceeded training time limit Accuracy = ", 0)
                             a = 100
                             b = 2
                             break
                         train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
+                    except Exception as error:
+                        print('Caught this error: ' + repr(error))
+                        return 0
 
-                    if time.clock() - t0 > self.TimeLimit:
-                        break
-                    # Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
-                    for i in range(self.BatchSizeTest):
-                        batch = self.mnist.test.next_batch(int(math.floor(10000 / self.BatchSizeTest)))
-                        try:
-                            temp = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: False})
-                        except:
-                            print("Error, most likely memory leakage")
-                            return 0
-                        result += temp
-                    b += 1
+                if time.clock() - t0 > self.TimeLimit:
+                    pass
 
+                # Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
+                for i in range(self.BatchSizeTest):
+                    batch = self.mnist.test.next_batch(int(math.floor(10000 / self.BatchSizeTest)))
+                    try:
+                        temp = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: False})
+                    except:
+                        print("Error, most likely memory leakage")
+                        return 0
+                    result += temp
                 if time.clock() - t0 > self.TimeLimit:
                     break
 
@@ -178,6 +248,7 @@ class CNN:
                 print((result / self.BatchSizeTest)*100)
                 if (result / self.BatchSizeTest)*100 < should_be:
                     break
+                result = 0
 
             result = 0
             #Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
