@@ -12,7 +12,8 @@ class CNN:
     Print_intermediate_accuracy = 100
     tf.set_random_seed(1)
 
-    def __init__(self, pop, IterationCountTrain, BatchSizeTrain, BatchSizeTest, TimeLimit, data_set):
+    def __init__(self, pop, IterationCountTrain, BatchSizeTrain, BatchSizeTest, TimeLimit, data_set, isRandom):
+        self.isRandom = isRandom
         self.IterationCountTrain = IterationCountTrain
         self.BatchSizeTrain = BatchSizeTrain
         self.TimeLimit = TimeLimit
@@ -26,23 +27,27 @@ class CNN:
             self.y_ = tf.placeholder(tf.float32, shape=[None, 10]) #Teisingi prediction
             self.is_train = tf.placeholder(tf.bool) #Naudojamas nustatyti ar vykdomas testavimas. Tam, kad galeciau nevykdyti drop_out
 
-    def weight_variable(self, shape):
-      initial = tf.truncated_normal(shape, stddev=0.1)
-      return tf.Variable(initial)
+    def weight_variable(self, shape, ca):
+        initial = tf.truncated_normal(shape, stddev=0.1)
+        if self.isRandom and ca != 0:
+            return tf.Variable(initial, trainable=False)
+        return tf.Variable(initial)
 
-    def bias_variable(self, shape):
-      initial = tf.constant(0.1, shape=shape)
-      return tf.Variable(initial)
+    def bias_variable(self, shape, ca):
+        initial = tf.constant(0.1, shape=shape)
+        if self.isRandom and ca != 0:
+            return tf.Variable(initial, trainable=False)
+        return tf.Variable(initial)
 
     def conv2d(self, x, W):
-      return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+        return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
 
     def max_pool_2x2(self, x, ksize):
-      return tf.nn.max_pool(x, ksize=[1, ksize, ksize, 1],
+        return tf.nn.max_pool(x, ksize=[1, ksize, ksize, 1],
                             strides=[1, ksize, ksize, 1], padding='SAME')
 
     def avg_pool_2x2(self, x, ksize):
-      return tf.nn.avg_pool(x, ksize=[1, ksize, ksize, 1],
+        return tf.nn.avg_pool(x, ksize=[1, ksize, ksize, 1],
                             strides=[1, ksize, ksize, 1], padding='SAME')
 
     #Dinamiškai sukuriu CNN modelį pagal duotą arhitektūrą
@@ -60,9 +65,8 @@ class CNN:
                     kSize = LA[i][1]
                     depth = LA[i][2]
 
-                    W_conv = self.weight_variable([kSize, kSize, currentDepth, depth])
-                    b_conv = self.bias_variable([depth])
-
+                    W_conv = self.weight_variable([kSize, kSize, currentDepth, depth], 1)
+                    b_conv = self.bias_variable([depth], 1)
                     x_image = tf.nn.relu(self.conv2d(x_image, W_conv) + b_conv)
                     currentDepth = depth
 
@@ -78,13 +82,13 @@ class CNN:
                     out = LA[i][1]
                     drop = LA[i][2]
                     if firstFC: #Šitą vėliau pakeisiu.
-                        W_fc = self.weight_variable([squareShape * squareShape * currentDepth, out])
+                        W_fc = self.weight_variable([squareShape * squareShape * currentDepth, out], 1)
                         h_fc = tf.reshape(x_image, [-1, squareShape * squareShape * currentDepth])
                         firstFC = False
                     else:
-                        W_fc = self.weight_variable([LA[i-1][1], out])
+                        W_fc = self.weight_variable([LA[i-1][1], out], 1)
 
-                    b_fc = self.bias_variable([out])
+                    b_fc = self.bias_variable([out], 1)
 
                     h_fc = tf.nn.relu(tf.matmul(h_fc, W_fc) + b_fc)
 
@@ -94,8 +98,8 @@ class CNN:
             #Toliau tiesiog prisegu FC su 10 output
             flat = h_fc
 
-            W_fc = self.weight_variable([out, 10])
-            b_fc = self.bias_variable([10])
+            W_fc = self.weight_variable([out, 10], 0)
+            b_fc = self.bias_variable([10], 0)
 
             y_conv = tf.matmul(flat, W_fc) + b_fc
 
@@ -124,7 +128,7 @@ class CNN:
         with tf.Session(graph=self.graph) as sess:
             sess.run(tf.global_variables_initializer())
             t0 = time.clock()
-
+            print("Train 1/3")
             for i in range(self.IterationCountTrain):
                 try:
                     batch = self.mnist.train.next_batch(self.BatchSizeTrain)
@@ -135,16 +139,14 @@ class CNN:
                         print('step %d, training accuracy %g' % (i + 1, train_accuracy))
                     if time.clock() - t0 > self.TimeLimit:
                         print("Exceeded training time limit Accuracy = ", 0)
-                        a = 100
-                        b = 2
                         break
                     train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
                 except Exception as error:
                     print('Caught this error: ' + repr(error))
-                    print("fuuu")
+                    return 0
 
-            if time.clock() - t0 > self.TimeLimit:
-                pass
+
+
 
             # Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
             for i in range(self.BatchSizeTest):
@@ -153,7 +155,7 @@ class CNN:
                     temp = accuracy.eval(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: False})
                 except Exception as error:
                     print('Caught this error: ' + repr(error))
-                    print("fuuu")
+                    return 0
                 result += temp
 
         tf.reset_default_graph()
@@ -161,7 +163,7 @@ class CNN:
         with tf.Session(graph=self.graph) as sess:
             sess.run(tf.global_variables_initializer())
             t0 = time.clock()
-
+            print("Train 2/3")
             for i in range(self.IterationCountTrain):
                 try:
                     batch = self.mnist.train.next_batch(self.BatchSizeTrain)
@@ -172,13 +174,10 @@ class CNN:
                         print('step %d, training accuracy %g' % (i + 1, train_accuracy))
                     if time.clock() - t0 > self.TimeLimit:
                         print("Exceeded training time limit Accuracy = ", 0)
-                        a = 100
-                        b = 2
                         break
                     train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
                 except Exception as error:
                     print('Caught this error: ' + repr(error))
-                    print("fuuu")
                     return 0
 
             if time.clock() - t0 > self.TimeLimit:
@@ -196,6 +195,7 @@ class CNN:
         tf.reset_default_graph()
         #3
         with tf.Session(graph=self.graph) as sess:
+            print("Train 3/3")
             sess.run(tf.global_variables_initializer())
             t0 = time.clock()
             a = 0
@@ -210,8 +210,6 @@ class CNN:
                             print('step %d, training accuracy %g' % (i + 1, train_accuracy))
                         if time.clock() - t0 > self.TimeLimit:
                             print("Exceeded training time limit Accuracy = ", 0)
-                            a = 100
-                            b = 2
                             break
                         train_step.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.is_train: True})
                     except Exception as error:

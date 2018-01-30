@@ -1,4 +1,6 @@
 import random
+from copy import deepcopy
+
 import CNNExecution as CNN
 from time import gmtime, strftime
 
@@ -84,6 +86,8 @@ def startGenerateFromScratch(population, input_length, max_layer_amount, max_con
                     fc_passed = True
 
             net.append(layer)
+        net = fix_network(net, max_layer_amount, max_conv_depth, max_fc_size, input_length, max_pool_kernel_size,
+                          max_conv_kernel_size, False)
         NETWORKS.append(net)
     return NETWORKS
 
@@ -95,10 +99,32 @@ def startGenerateConvLayer(input_length, max_depth, max_conv_kernel_size):
     return LAYER
 
 
-# Metodas atsitiktinai kuria Pool sluoksni
+# Metodas atsitiktinai kuria Pool (APool arba MPool su 50 proc. sansu atskirai) sluoksni
 # Grazina sluoksnio masyva
 def startGeneratePoolLayer(input_length, max_pool_kernel_size):
-    LAYER = ["Pool"]
+    type = random.randint(0, 1)
+    if type == 0:
+        LAYER = ["APool"]
+    else:
+        LAYER = ["MPool"]
+    kSize = random.randint(1, int(min(input_length, max_pool_kernel_size)))
+    LAYER.append(kSize)
+    return LAYER
+
+
+# Metodas atsitiktinai kuria Average Pool sluoksni
+# Grazina sluoksnio masyva
+def startGenerateAvgPoolLayer(input_length, max_pool_kernel_size):
+    LAYER = ["APool"]
+    kSize = random.randint(1, int(min(input_length, max_pool_kernel_size)))
+    LAYER.append(kSize)
+    return LAYER
+
+
+# Metodas atsitiktinai kuria Max Pool sluoksni
+# Grazina sluoksnio masyva
+def startGenerateMaxPoolLayer(input_length, max_pool_kernel_size):
+    LAYER = ["MPool"]
     kSize = random.randint(1, int(min(input_length, max_pool_kernel_size)))
     LAYER.append(kSize)
     return LAYER
@@ -107,14 +133,42 @@ def startGeneratePoolLayer(input_length, max_pool_kernel_size):
 # Metodas atsitiktinai kuria FC sluoksni
 # Grazina sluoksnio masyva
 def startGenerateFCLayer(max_fc_size):
-    LAYER = ["FC", random.randint(1, max_fc_size), 1]
+    LAYER = ["FC", random.randint(10, max_fc_size), 1]
     return LAYER
+
+# Surikiuoti tinklus mazejimo tvarka pagal ju geruma (fitnessa)
+def sortNetworksByFitness(past_generation_networks, fitness):
+    # Istatomas fitnessas ir pagal ji rikiuojama
+    for past_gen_net_idx in range(0, len(past_generation_networks)):
+        past_generation_networks[past_gen_net_idx].insert(0, fitness[past_gen_net_idx])
+    past_generation_networks.sort(key=lambda x: x[0], reverse=True)
+
+    # Fitness isimamas is masyvo
+    for past_gen_net_idx in range(0, len(past_generation_networks)):
+        past_generation_networks[past_gen_net_idx].pop(0)
+
+    return past_generation_networks
+
+
+# Metodas grazina geriausius netus ir praeito generationo
+def returnBest(past_generation_networks, fitness, best_unchanged_amount):
+    # Geriausiu atrinktu masyvas
+    best_networks = []
+
+    # Pridedamas i kito generationo masyva
+    for best_unchanged_idx in range(0, best_unchanged_amount):
+        best_networks.append(deepcopy(past_generation_networks[best_unchanged_idx]))
+
+    return best_networks
+
 
 
 # Metodas parenka sekancios kartos netus, renka, kurie bus kryzminami
 # Grazina kitos kartos tinklu masyva
-def generationSelection(past_generation_networks, fitness, best_unchanged_amount, crossover_amount, random_new_amount,
-                        max_layer_amount, max_conv_depth, max_fc_size, input_length, max_pool_kernel_size, max_conv_kernel_size):
+def generationSelection(past_generation_networks, crossover_amount, random_new_amount,
+                        max_layer_amount, max_conv_depth, max_fc_size, input_length, max_pool_kernel_size,
+                        max_conv_kernel_size):
+
     # Kito generationo masyvas
     next_generation_networks = []
 
@@ -124,24 +178,22 @@ def generationSelection(past_generation_networks, fitness, best_unchanged_amount
     for random_new_network in random_new_networks:
         next_generation_networks.append(random_new_network)
 
+
     # Rinkti kombinacijas tinklu ju kryzminimui, tikrinti
     # Galimos ir tos pacios kombinacijos, kadangi kryzminimas yra su atsitiktinumais, nesigaus identiskas rezultatas
     for crossover_idx in range(0, crossover_amount):
         parent1_idx = min(int(abs(random.gauss(0, 5))), len(past_generation_networks) - 1)
         parent2_idx = min(int(abs(random.gauss(0, 5))), len(past_generation_networks) - 1)
-        next_generation_networks.append(
-            crossover1(past_generation_networks[parent1_idx][:], past_generation_networks[parent2_idx][:], max_layer_amount,
-                       max_conv_depth, max_fc_size, input_length, max_pool_kernel_size, max_conv_kernel_size))
+        cross_net = crossover1(deepcopy(past_generation_networks[parent1_idx]),
+                               deepcopy(past_generation_networks[parent2_idx]),
+                               max_layer_amount, max_conv_depth, max_fc_size, input_length, max_pool_kernel_size,
+                               max_conv_kernel_size)
+        mutated_cross_net = mutation(cross_net, 0.05, 0.1, 0.2, max_layer_amount, max_conv_depth, max_fc_size,
+                                     input_length, max_pool_kernel_size, max_conv_kernel_size)
+        mutated_cross_net = fix_network(mutated_cross_net, max_layer_amount, max_conv_depth, max_fc_size, input_length,
+                                        max_pool_kernel_size, max_conv_kernel_size, True)
+        next_generation_networks.append(mutated_cross_net)
 
-    # Istatyti i kita generationa best_unchanged_amount kieki geriausiu netu
-    # Fitness pridedamas kaip pirmas masyvo elementas, pagal ji rikiuojamas masyvas
-    for past_gen_net_idx in range(0, len(past_generation_networks)):
-        past_generation_networks[past_gen_net_idx].insert(0, fitness[past_gen_net_idx])
-    past_generation_networks.sort(key=lambda x: x[0], reverse=True)
-    # Fitness isimamas is masyvo ir pridedamas i kito generationo masyva
-    for best_unchanged_idx in range(0, best_unchanged_amount):
-        past_generation_networks[best_unchanged_idx].pop(0)
-        next_generation_networks.append(past_generation_networks[best_unchanged_idx])
 
     return next_generation_networks
 
@@ -157,7 +209,8 @@ def calculateFitness(networks):
 
 
 # Metodas is dvieju pasirinktu tinklu padaro sukryzminta
-def crossover1(parent1, parent2, max_layer_amount, max_conv_depth, max_fc_size, input_length, max_pool_kernel_size, max_conv_kernel_size):
+def crossover1(parent1, parent2, max_layer_amount, max_conv_depth, max_fc_size, input_length, max_pool_kernel_size,
+               max_conv_kernel_size):
     # Crossover1 veikimas- kazkokia dalis parent1 tinklo yra istrinama, i ta vieta yra perkialiama kazkokia
     # parent2 tinklo dalis. Pirmas Conv layeris ir paskutinis FC layeris yra irgi pakeiciami arba suvidurkinami
 
@@ -178,7 +231,7 @@ def crossover1(parent1, parent2, max_layer_amount, max_conv_depth, max_fc_size, 
         # Kuriamas range, is kurio bus perkeliami sluoksniai is parent2 i parent1
         for rand_num in range(0, 2):
             if len(parent2) > 2:
-                rand_range_2.append(random.randint(1, len(parent2) - 2))
+                rand_range_2.append(random.randint(0, len(parent2) - 1))
             else:
                 rand_range_2 = [1, 1]
 
@@ -204,7 +257,8 @@ def crossover1(parent1, parent2, max_layer_amount, max_conv_depth, max_fc_size, 
                                                       input_length, max_conv_kernel_size)
 
     # Sutvarkyt neta, kad nebutu netinkamu dydziu struktura, nebutu po fc layerio conv arba pool
-    cross_net = fix_network(cross_net, max_layer_amount, max_conv_depth, max_fc_size, input_length, max_pool_kernel_size, max_conv_kernel_size)
+    # cross_net = fix_network(cross_net, max_layer_amount, max_conv_depth, max_fc_size, input_length,
+    #                        max_pool_kernel_size, max_conv_kernel_size, True)
 
     return cross_net
 
@@ -212,7 +266,8 @@ def crossover1(parent1, parent2, max_layer_amount, max_conv_depth, max_fc_size, 
 # Metodas sutvarko neuroninio tinklo struktura. Jei po mutaciju ar kryzminimo neatitinka layerio seka, pvz pooling
 # kernelio dydis dalinasi su liekana is inputo dimensiju, arba yra kitokiu layeriu po fc layerio, pertvarkyti
 # taip, kad tas nebutu pazeista
-def fix_network(network, max_layer_size, max_conv_depth, max_fc_size, input_length, max_pool_kernel_size, max_conv_kernel_size):
+def fix_network(network, max_layer_size, max_conv_depth, max_fc_size, input_length, max_pool_kernel_size,
+                max_conv_kernel_size, change_fc):
     # Issaugojamas input_length, kuris bus keiciamas sluoksniu tikrinimo eigoje
     cur_input_length = input_length
     # Tikrinimui, ar fc layeris buvo esant kitiems layeriams po jo
@@ -245,13 +300,14 @@ def fix_network(network, max_layer_size, max_conv_depth, max_fc_size, input_leng
                 network[layer_idx] = max_conv_depth
 
         # Jei pool tipo layeris
-        elif network[layer_idx][0] == "Pool":
+        elif network[layer_idx][0] == "APool" or network[layer_idx][0] == "MPool":
             # Jei pries ji buvo FC layeris tai layeri perrasyti random fc layeriu
             if fc_passed:
                 network[layer_idx] = startGenerateFCLayer(max_fc_size)
                 continue
 
             # Jei kernelio dydis per mazas arba per didelis
+            print(network)
             if network[layer_idx][1] < 1:
                 network[layer_idx][1] = 1
             elif network[layer_idx][1] > min(input_length, max_pool_kernel_size):
@@ -262,7 +318,7 @@ def fix_network(network, max_layer_size, max_conv_depth, max_fc_size, input_leng
 
         elif network[layer_idx][0] == "FC":
             fix_fc = random.randint(0, 1)
-            if fix_fc == 0 and not fc_passed:
+            if fix_fc == 0 and not fc_passed and change_fc:
                 # layer_type = random.randint(0, 1)
                 # if layer_type == 0:
                 #     network[layer_idx] = startGenerateConvLayer(input_length, max_conv_depth,
@@ -271,11 +327,13 @@ def fix_network(network, max_layer_size, max_conv_depth, max_fc_size, input_leng
                 #    network[layer_idx] = startGeneratePoolLayer(input_length,
                 #                                                int(min(max_pool_kernel_size, input_length)))
                 network[layer_idx] = network[layer_idx + 1]
+                if network[layer_idx][0] == "FC":
+                    fc_passed = True
                 layer_idx -= 1
             else:
                 # Jei fc nodu kiekis mazesnis uz 1, padaryti 1
-                if network[layer_idx][1] < 1:
-                    network[layer_idx][1] = 1
+                if network[layer_idx][1] < 10:
+                    network[layer_idx][1] = 10
 
                 # Jei fc nodu kiekis didesnis uz limita, padaryti ju skaiciu limito skaiciumi
                 elif network[layer_idx][1] > max_fc_size:
@@ -283,6 +341,19 @@ def fix_network(network, max_layer_size, max_conv_depth, max_fc_size, input_leng
 
                 # Uztvirtinama, kad einant per sluoksnius FC sluoksnis jau buvo
                 fc_passed = True
+
+    # Trinti FC layerius, jei ju pries pabaiga daugiau nei 2
+    fc_amount = 0
+    idx_layer = len(network) - 1
+    while network[idx_layer][0] == "FC":
+        fc_amount += 1
+        idx_layer -= 1
+
+    fc_amount -= 2
+
+    while fc_amount > 0:
+        network.pop(len(network) - 1)
+        fc_amount -= 1
 
     return network
 
@@ -327,6 +398,70 @@ def crossover_first_last_layers_swap(cross_net, parent2):
     return cross_net
 
 
+# Metodas mutuoja neuronini tinkla
+def mutation(network, layer_type_change_prob, mid_layer_data_change_prob, end_start_layer_data_change_prob,
+             max_layer_size, max_conv_depth, max_fc_size, input_length, max_pool_kernel_size, max_conv_kernel_size):
+    # Apskaiciuoti random, ar bus atliekama mutacija
+    rand_type_change = random.randint(0, 100) / 100
+    rand_mid_data_change = random.randint(0, 100) / 100
+    rand_end_start_data_change = random.randint(0, 100) / 100
+
+    # Sluoksnio tipo keitimo mutacija bus vykdoma, jei netas turi bent viena vidini sluoksni tarp pirmo conv ir pask. fc
+    if rand_type_change <= layer_type_change_prob and len(network) - 2 > 0:
+        layer = random.randint(0, len(network) - 3)
+        type = random.randint(0, 2)
+        if type == 0:
+            network[layer + 1] = startGenerateConvLayer(input_length, max_conv_depth, max_conv_kernel_size)
+        elif type == 1:
+            network[layer + 1] = startGeneratePoolLayer(input_length, max_pool_kernel_size)
+        else:
+            network[layer + 1] = startGenerateFCLayer(max_fc_size)
+
+    # Keičiami tik sluoksnio duomenys, tipas paliekamas tas pats
+    if rand_mid_data_change <= mid_layer_data_change_prob:
+        layer = random.randint(1, len(network) - 2)
+        if network[layer][0] == "Conv":
+            rand = int(random.gauss(0, max_conv_kernel_size / 8))
+            while network[layer][1] + rand > max_conv_kernel_size or network[layer][1] + rand < 1:
+                rand = int(random.gauss(0, max_conv_kernel_size / 8))
+            network[layer][1] += rand
+            rand = int(random.gauss(0, max_conv_depth / 8))
+            while network[layer][2] + rand > max_conv_depth or network[layer][2] + rand < 1:
+                rand = int(random.gauss(0, max_conv_kernel_size / 8))
+            network[layer][2] += rand
+        elif network[layer][0] == "APool":
+            network[layer][1] = startGenerateAvgPoolLayer(input_length, max_pool_kernel_size)
+        elif network[layer][0] == "MPool":
+            network[layer] = startGenerateMaxPoolLayer(input_length, max_pool_kernel_size)
+        else:
+            rand = int(random.gauss(0, max_fc_size / 8))
+            while network[layer][1] + rand > max_fc_size or network[layer][1] + rand < 10:
+                rand = int(random.gauss(0, max_fc_size / 8))
+            network[layer][1] += rand
+
+    # Keiciami tik pirmo arba paskutnio sluoksnio duomenys, tipas paliekamas tas pats (del tikimybiu skirtumo)
+    if rand_end_start_data_change <= end_start_layer_data_change_prob:
+        layer = random.randint(0, 1)
+        if layer == 0:
+            rand = int(random.gauss(0, max_conv_kernel_size / 8))
+            while network[layer][1] + rand > max_conv_kernel_size or network[layer][1] + rand < 1:
+                rand = int(random.gauss(0, max_conv_kernel_size / 8))
+            network[layer][1] += rand
+            rand = int(random.gauss(0, max_conv_depth / 8))
+            while network[layer][2] + rand > max_conv_depth or network[layer][2] + rand < 1:
+                rand = int(random.gauss(0, max_conv_kernel_size / 8))
+            network[layer][2] += rand
+        else:
+            rand = int(random.gauss(0, max_fc_size / 8))
+            while network[layer][1] + rand > max_fc_size or network[layer][1] + rand < 10:
+                rand = int(random.gauss(0, max_fc_size / 8))
+            network[layer][1] += rand
+
+    # network = fix_network(network, max_layer_size, max_conv_depth, max_fc_size, input_length, max_pool_kernel_size,
+    #                       max_conv_kernel_size, False)
+    return network
+
+
 # Metodas random priskiria skaiciu fitnessui
 def test_random_fitness(array_size):
     fitness = []
@@ -337,8 +472,78 @@ def test_random_fitness(array_size):
 
 def main():
     g = 1
+
+    elitism_amount = 5
+    random_new_amount = 3
+    crossover_amount = 22
+    starting_amount = 30
+
+    input_length = 28
+    layer_limit = 8
+    conv_depth_limit = 64
+    fc_node_limit = 999
+    conv_kernel_limit = 13
+    pool_kernel_limit = 4
+
+    BEST_NETWORKS = []
+    BEST_FITNESS = []
+
+    do_print = True  # Ar spausdinti į failus?
+    NETWORKS = startGenerateFromScratch(starting_amount, input_length, layer_limit, conv_depth_limit, fc_node_limit,
+                                        pool_kernel_limit, conv_kernel_limit)
+    if do_print:
+        write_debug_to_file(NETWORKS, g)
+
+    # Treniruoti ir testuoti tinklus
+    #FITNESS = CNN.CNNExecution().evaluate_population(NETWORKS, False)
+    FITNESS = test_random_fitness(30)
+    while True:
+
+        max_fit_ind = FITNESS.index(max(FITNESS))
+        if do_print:
+            write_res_to_file(NETWORKS[max_fit_ind], FITNESS[max_fit_ind], g)
+        g += 1
+
+        # Tinklai rikiuojami mazejimo tvarka pagal fitnessa
+        NETWORKS = sortNetworksByFitness(NETWORKS, FITNESS)
+        FITNESS.sort(reverse=True)
+
+        # Grazina geriausius networkus is praeito generationo
+        BEST_NETWORKS = returnBest(NETWORKS, FITNESS, elitism_amount)
+        # Geriausiu networku fitnessas issaugojamas, ju traininti dar karta nereikia
+        for idx in range(0, elitism_amount):
+            BEST_FITNESS.append(FITNESS[idx])
+
+        # Generuoti kita karta
+        NETWORKS = generationSelection(NETWORKS, crossover_amount, random_new_amount, layer_limit, conv_depth_limit,
+                                       fc_node_limit, input_length, pool_kernel_limit, conv_kernel_limit)
+
+        for idx in range(0, len(NETWORKS)):
+            print(NETWORKS[idx])
+
+        # Treniruoti ir testuoti tinklus
+        FITNESS = CNN.CNNExecution().evaluate_population(NETWORKS, False)
+
+
+        # Ideti praeitos kartos geriausius kartu su fitnessu
+        for idx in range(0, elitism_amount):
+            FITNESS.append(BEST_FITNESS[idx])
+            NETWORKS.append(deepcopy(BEST_NETWORKS[idx]))
+
+        for idx in range(0, len(NETWORKS)):
+            print(NETWORKS[idx])
+            print(FITNESS[idx])
+
+        BEST_NETWORKS = []
+        BEST_FITNESS = []
+
+        if do_print:
+            write_debug_to_file(NETWORKS, g)
+'''
+def main():
+    g = 1
     do_print = False  #Ar spausdinti į failus?
-    NETWORKS = startGenerateFromScratch(5, 28, 6, 64, 1000, 4, 13)
+    NETWORKS = startGenerateFromScratch(30, 28, 6, 64, 1000, 4, 13)
     if do_print:
         write_debug_to_file(NETWORKS, g)
     training_examples = 200 # Su kiek training example iš pradžių skaičiuti?
@@ -360,7 +565,7 @@ def main():
         NETWORKS = generationSelection(NETWORKS, fitness, 5, 17, 3, 6, 64, 1000, 28, 4, 13)
         if do_print:
             write_debug_to_file(NETWORKS, g)
-
+'''
 
 if __name__ == "__main__":
     main()
