@@ -241,12 +241,17 @@ class CNN:
                     should_be = 96.5
                 if a == 3:
                     should_be = 97.4
-                a += 1
 
                 print((result / self.BatchSizeTest)*100)
                 if (result / self.BatchSizeTest)*100 < should_be:
+                    if a == 0:
+                        print('Accuracy = ' + str(
+                            "%.4f" % (result / self.BatchSizeTest)))
+                        return result / self.BatchSizeTest
                     break
+
                 result = 0
+                a += 1
 
             result = 0
             #Testavimas (dėl problemų su memory išskaidau 10k paveiksleliu į bachus)
@@ -259,13 +264,18 @@ class CNN:
                     return 0
                 result += temp
 
-            print('Accuracy = ' + str("%.4f" % (result / self.BatchSizeTest)) + ' Total computation time = ' + str("%.2f" % (time.clock() - t0)) + "s")
+            print('Accuracy = ' + str("%.4f" % (result / self.BatchSizeTest)))
 
         return result / self.BatchSizeTest
 
     # Pagrindinis metodas individo treniravimui
     def exec_cnn(self):
-        result = self.trainCNN(self.pop) * 100
+        try:
+            result = self.trainCNN(self.pop) * 100
+        except Exception as error:
+            print('Caught this error: ' + repr(error))
+            result = 0
         tf.reset_default_graph()
+        print("Grazinu", result)
         return result
 
