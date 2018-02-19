@@ -49,14 +49,21 @@ class CNNExecution:
     #Kadangi mažo ilgio networkai (arba networkai su daug pool layeriu) rodo gerus rezultatus treniruojant tik paskutinį layerį.
     def get_additional_score(self, individual, result):
         number_of_pool = 0
-        for layer in individual:
-            if layer[0] == "APool" or layer[0] == "MPool":
+        is_in_succession = False
+        for i in range(len(individual)):
+            if individual[i][0] == "APool" or individual[i][0] == "MPool":
                 number_of_pool += 1
+                if individual[i-1][0] == "APool" or individual[i-1][0] == "MPool":
+                    result -= 10
+                    is_in_succession = True
 
-        if len(individual) < 4:
-            result -= 20
-        if len(individual) >= 6 & number_of_pool < 3:
+        if len(individual) < 5:
+            result -= 35
+        if 8 > len(individual) >= 5 & 0 < number_of_pool < 3:
             result += 10
+            if number_of_pool == 2 and not is_in_succession:
+                result += 15
+
         if result < 0:
             result = 0
 
@@ -71,12 +78,13 @@ class CNNExecution:
         batch_size_train = 50
         t0 = time.time()
         a = 1
+        iteration_count = math.floor(self.example_count_train / batch_size_train)
         if start_only_last_layer:
             for individual in population:
                 print("-----------------------------------------------------------------------------------")
                 print("Training individual nr.", a, "(Only last layer)")
                 print(str(individual))
-                iteration_count = math.floor(self.example_count_train / batch_size_train)
+
                 print("Number of steps " + str(iteration_count))
                 result = cnn.CNN(individual, iteration_count, batch_size_train, self.batch_size_test, self.training_time_limit, self.data_set, True).exec_cnn()
                 if result == 0:
@@ -107,17 +115,18 @@ class CNNExecution:
                 print("-----------------------------------------------------------------------------------")
             a = 1
         else:
-            to_next_phase = population
+            to_next_phase = len(population)
+            op = copy.deepcopy(population)
 
         for i in range(to_next_phase):
             print("Training individual nr.", a, "(All layers)")
-
-            op[i].pop(0)
-            print(op[i])
-            ind = population.index(op[i])
-            rez.pop(ind)
-            ab = population.pop(ind)
-            population.append(ab)
+            if start_only_last_layer:
+                op[i].pop(0)
+                print(op[i])
+                ind = population.index(op[i])
+                rez.pop(ind)
+                ab = population.pop(ind)
+                population.append(ab)
             result = cnn.CNN(op[i], iteration_count, batch_size_train, self.batch_size_test, self.training_time_limit,
                         self.data_set, False).exec_cnn()
             if result == 0:

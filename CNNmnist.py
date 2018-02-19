@@ -239,15 +239,15 @@ class CNN:
 
                 should_be = 0
                 if a == 0:
-                    should_be = 93.3
+                    should_be = 999.3
                     if not self.isRandom:
                         result /= 3
                 if a == 1:
-                    should_be = 95.6
+                    should_be = 995.6
                 if a == 2:
-                    should_be = 96.5
+                    should_be = 969.5
                 if a == 3:
-                    should_be = 97.4
+                    should_be = 979.4
 
                 print((result / self.BatchSizeTest)*100)
                 if (result / self.BatchSizeTest)*100 < should_be:
